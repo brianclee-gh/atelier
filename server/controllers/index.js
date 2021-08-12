@@ -1,25 +1,6 @@
 /* eslint-disable camelcase */
 const { db } = require('../../db/index');
 
-// const example = `SELECT
-//   name,
-//   slogan,
-//   description,
-//   category,
-//   default_price,
-//   ARRAY_AGG (
-//     feature,
-//     value
-//       FROM
-//         products.features
-//           WHERE
-//             products.features.product_id = 1
-//   ) as features
-//   FROM
-//     products.products
-//       WHERE
-//         products.products.id = 1`;
-
 module.exports = {
   getProducts: (req, res) => {
     let { page, count } = req.body;
@@ -33,24 +14,36 @@ module.exports = {
   },
   getProduct: (req, res) => {
     const { product_id } = req.params;
-    // need product + features
+    db.query(`SELECT *, ( SELECT jsonb_agg(
+      jsonb_build_object(
+        'feature', products.features.feature,
+        'value', products.features.value)
+   )
+      FROM products.features
+        WHERE products.features.product_id =11) as results
+     FROM products.products as p
+       WHERE p.id = ${product_id};`)
+      .then((productData) => {
+        res.send(productData.rows[0]);
+      })
+      .catch((err) => console.log(err));
     // db.query(`SELECT * FROM products.products WHERE id = ${product_id};`)
     //   .then((productData) => {
-    //     db.query(`SELECT feature, value FROM products.features
-    // WHERE products.features.product_id = ${product_id};`)
-    //       .then((featuresData) => {
-    //         res.send([productData.rows, featuresData.rows]);
+    //     db.query(`SELECT json_agg(
+    //       json_build_object(
+    //         'feature', products.features.feature,
+    //         'value', products.features.value)
+    //     )
+    //       FROM products.features
+    //         WHERE products.features.product_id = ${product_id}`)
+    //       .then((featureData) => {
+    //         const product = productData.rows[0];
+    //         product.results = featureData.rows[0].json_agg;
+    //         res.send([productData.rows[0]]);
     //       })
     //       .catch((err) => console.log(err));
-    //     // should I make two separate calls (one to fetch products, another to fetch features?)
     //   })
     //   .catch((err) => console.log(err));
-    // db.query(example)
-    //   .then((productData) => {
-    //     res.send(productData.rows);
-    //   })
-    //   .catch((err) => console.log(err));
-    // should I make two separate calls (one to fetch products, another to fetch features?)
   },
   getStyles: (req, res) => {
     // need styles + photos + skus
@@ -63,24 +56,11 @@ module.exports = {
   },
   getRelatedProducts: (req, res) => {
     const { product_id } = req.params;
-    db.query(`SELECT * FROM products.related WHERE current_product_id = ${product_id};`)
+    db.query(`SELECT array_agg(related_product_id) FROM products.related WHERE current_product_id = ${product_id};`)
       .then((data) => {
-        const relatedIds = [];
-        data.rows.forEach((obj) => {
-          if (relatedIds.indexOf(obj.related_product_id) < 0) {
-            relatedIds.push(obj.related_product_id);
-          }
-        });
-        // // manage duplicates here
-        res.send(relatedIds);
-        // res.send(data.rows)
+        const filtered = [...new Set(data.rows[0].array_agg)];
+        res.send(filtered);
       })
       .catch((err) => console.log(err));
   },
 };
-
-// 'SELECT name, slogan, description, category, default_price, feature, value
-// 	FROM products.products
-// 			INNER JOIN products.features
-// 				ON products.products.id = products.features.product_id
-// 					WHERE products.products.id = ${product_id};'
