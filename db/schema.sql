@@ -35,9 +35,9 @@ CREATE TABLE products.related (
 
 CREATE TABLE products.skus (
     id integer NOT NULL,
-    quantity integer,
-    size character varying(10),
     style_id integer
+    size character varying(10),
+    quantity integer,
 );
 
 CREATE TABLE products.styles (
