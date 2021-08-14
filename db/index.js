@@ -1,6 +1,8 @@
-const { Pool, Client } = require('pg');
+const { Pool } = require('pg');
 const { credentials } = require('./config');
 
-const db = new Client(credentials);
+const pool = new Pool(credentials);
 
-module.exports = { db };
+module.exports = { pool };
+
+//sudo launchctl limit maxfiles 40480 28000

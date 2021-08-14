@@ -1,64 +1,105 @@
 /* eslint-disable camelcase */
-const { db } = require('../../db/index');
+const { pool } = require('../../db/index');
 
 module.exports = {
   getProducts: (req, res) => {
     let { page, count } = req.body;
     if (!page) { page = 1; }
     if (!count) { count = 5; }
-    db.query(`SELECT data FROM prod_jsonb LIMIT ${count} OFFSET ${(count * (page - 1))};`)
-      .then((data) => {
-        res.send(data.rows.map((item) => item.data));
-      })
-      .catch((err) => console.log(err));
+    const queryString = `SELECT id, name, slogan, category, description, default_price FROM products LIMIT ${count} OFFSET ${(count * (page - 1))};`;
+    pool
+      .connect()
+      .then((client) => client
+        .query(queryString)
+        .then((data) => {
+          client.release();
+          res.send(data.rows);
+        })
+        .catch((err) => {
+          client.release();
+          console.log(err.stack);
+        }));
   },
   getProduct: (req, res) => {
     const { product_id } = req.params;
-    db.query(`SELECT data FROM prod_feat_jsonb WHERE id = ${product_id}`)
-      .then((productData) => {
-        res.send(productData.rows[0].data);
-      })
-      .catch((err) => console.log(err));
+    const queryString = `SELECT *, (
+      SELECT json_agg(json_build_object(
+        'feature', feature,
+        'value', value
+      )) as features
+        from features
+          where product_id = p.id
+            group by product_id
+    ) from products as p where id = ${product_id}`;
+    pool
+      .connect()
+      .then((client) => client
+        .query(queryString)
+        .then((productData) => {
+          client.release();
+          res.send(productData.rows[0]);
+        })
+        .catch((err) => {
+          client.release();
+          console.log(err.stack);
+        }));
   },
   getStyles: (req, res) => {
-    // need styles + photos + skus
     const { product_id } = req.params;
-    db.query(`SELECT product_id, json_build_object(
+    const queryString = `SELECT product_id, json_agg(json_build_object(
       'style_id', style_id,
       'name', name,
       'original_price', original_price,
       'sale_price', sale_price,
       'default?', default_style,
       'photos',
-       (SELECT json_agg(jsonb_build_object(
+      (SELECT json_agg(json_build_object(
           'thumbnail_url', thumbnail_url,
           'url', url
-        )) FROM products.photos WHERE style_id = products.styles.style_id),
-     'skus',
-       (SELECT
-           json_object_agg(id,
-               jsonb_build_object(
+        )) FROM photos WHERE style_id = styles.style_id),
+    'skus',
+      (SELECT
+          json_object_agg(id,
+              json_build_object(
             'size', size,
             'quantity', quantity
-               )
-           ) as skus
-         FROM products.skus
-         WHERE style_id = products.styles.style_id
-             GROUP by style_id)
-     ) as results FROM products.styles
-        WHERE products.styles.product_id = ${product_id}`)
-      .then((data) => {
-        res.send(data.rows);
-      })
-      .catch((err) => console.log(err));
+              )
+          ) as skus
+        FROM skus
+        WHERE style_id = styles.style_id
+            GROUP by style_id)
+    )) as results FROM styles
+        WHERE styles.product_id = ${product_id}
+          GROUP BY product_id`;
+
+    pool
+      .connect()
+      .then((client) => client
+        .query(queryString)
+        .then((data) => {
+          client.release();
+          res.send(data.rows[0]);
+        })
+        .catch((err) => {
+          client.release();
+          console.log(err.stack);
+        }));
   },
   getRelatedProducts: (req, res) => {
     const { product_id } = req.params;
-    db.query(`SELECT related FROM prod_related WHERE id = ${product_id};`)
-      .then((data) => {
-        const filtered = [...new Set(data.rows[0].related)];
-        res.send(filtered);
-      })
-      .catch((err) => console.log(err));
+    const queryString = `SELECT json_agg(related_product_id) AS related FROM related WHERE current_product_id = ${product_id};`;
+    pool
+      .connect()
+      .then((client) => client
+        .query(queryString)
+        .then((data) => {
+          client.release();
+          const filtered = [...new Set(data.rows[0].related)];
+          res.send(filtered);
+        })
+        .catch((err) => {
+          client.release();
+          console.log(err.stack);
+        }));
   },
 };
