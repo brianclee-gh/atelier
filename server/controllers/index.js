@@ -6,7 +6,8 @@ module.exports = {
     let { page, count } = req.body;
     if (!page) { page = 1; }
     if (!count) { count = 5; }
-    const queryString = `SELECT id, name, slogan, category, description, default_price FROM products LIMIT ${count} OFFSET ${(count * (page - 1))};`;
+    const queryString = `SELECT id, name, slogan, category, description, default_price
+      FROM products LIMIT ${count} OFFSET ${(count * (page - 1))};`;
     pool
       .connect()
       .then((client) => client
@@ -31,18 +32,25 @@ module.exports = {
           where product_id = p.id
             group by product_id
     ) from products as p where id = ${product_id}`;
-    pool
-      .connect()
-      .then((client) => client
-        .query(queryString)
-        .then((productData) => {
-          client.release();
-          res.send(productData.rows[0]);
-        })
-        .catch((err) => {
-          client.release();
-          console.log(err.stack);
-        }));
+
+    pool.query(queryString, (err, data) => {
+      if (err) {
+        throw err;
+      }
+      res.send(data.rows[0]);
+    });
+    // pool
+    //   .connect()
+    //   .then((client) => client
+    //     .query(queryString)
+    //     .then((productData) => {
+    //       client.release();
+    //       res.send(productData.rows[0]);
+    //     })
+    //     .catch((err) => {
+    //       client.release();
+    //       console.log(err.stack);
+    //     }));
   },
   getStyles: (req, res) => {
     const { product_id } = req.params;
