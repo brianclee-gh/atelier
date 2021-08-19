@@ -72,7 +72,7 @@ module.exports = {
 
     db.any(queryString, [product_id])
       .then((data) => {
-        res.send(data);
+        res.send(data[0]);
       })
       .catch((error) => {
         console.log(error);
